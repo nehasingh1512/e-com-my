@@ -68,26 +68,38 @@ export function CartProvider({ children }) {
           .filter((c) => c.product)
           .map((c) => ({ ...c.product, qty: c.qty, selectedSize: c.size || undefined, selectedColor: c.color || undefined }));
         const serverWishlist = wishlistRes.data || [];
-        const guestCart = loadLocal(CART_GUEST_KEY, []);
-        const guestWishlist = loadLocal(WISHLIST_GUEST_KEY, []);
 
-        const mergedCartMap = new Map();
-        [...serverCart, ...guestCart].forEach((item) => {
-          const key = getCartLineId(item);
-          if (mergedCartMap.has(key)) {
-            mergedCartMap.get(key).qty += item.qty || 1;
-          } else {
-            mergedCartMap.set(key, { ...item, qty: item.qty || 1 });
-          }
+        const mergeLines = (baseline, current) => {
+          const map = new Map();
+          [...baseline, ...current].forEach((item) => {
+            const key = getCartLineId(item);
+            if (map.has(key)) map.get(key).qty += item.qty || 1;
+            else map.set(key, { ...item, qty: item.qty || 1 });
+          });
+          return Array.from(map.values());
+        };
+        const mergeWishlist = (baseline, current) => {
+          const map = new Map();
+          [...baseline, ...current].forEach((item) => map.set(item._id || item.slug, item));
+          return Array.from(map.values());
+        };
+
+        // Merge against the CURRENT React state, captured via a functional
+        // updater, rather than a localStorage snapshot read at this point in
+        // time — if addToCart()/toggleWishlist() were called while this fetch
+        // was still in flight, a stale snapshot would silently overwrite them
+        // once this resolves. The functional updater always sees the latest
+        // state, however many changes happened in between.
+        let mergedCart;
+        let mergedWishlist;
+        setCart((current) => {
+          mergedCart = mergeLines(serverCart, current);
+          return mergedCart;
         });
-        const mergedCart = Array.from(mergedCartMap.values());
-
-        const mergedWishlistMap = new Map();
-        [...serverWishlist, ...guestWishlist].forEach((item) => mergedWishlistMap.set(item._id || item.slug, item));
-        const mergedWishlist = Array.from(mergedWishlistMap.values());
-
-        setCart(mergedCart);
-        setWishlist(mergedWishlist);
+        setWishlist((current) => {
+          mergedWishlist = mergeWishlist(serverWishlist, current);
+          return mergedWishlist;
+        });
 
         localStorage.setItem(CART_SERVER_KEY, JSON.stringify(mergedCart));
         localStorage.setItem(WISHLIST_SERVER_KEY, JSON.stringify(mergedWishlist));

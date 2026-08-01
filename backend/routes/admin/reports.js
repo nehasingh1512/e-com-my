@@ -4,16 +4,10 @@ import Product from "../../models/Product.js";
 import User from "../../models/User.js";
 import { protect } from "../../middleware/auth.js";
 import { requirePermission } from "../../middleware/adminAuth.js";
+import { toCSV } from "../../utils/csv.js";
 
 const router = express.Router();
 router.use(protect, requirePermission("reports"));
-
-const toCSV = (rows) => {
-  if (!rows.length) return "";
-  const headers = Object.keys(rows[0]);
-  const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  return [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
-};
 
 // GET /api/admin/reports/sales?from=&to=&format=json|csv
 router.get("/sales", async (req, res) => {

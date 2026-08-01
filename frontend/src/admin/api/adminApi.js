@@ -8,6 +8,21 @@ adminApi.interceptors.request.use((config) => {
   return config;
 });
 
+// window.open()/a plain <a href> can't attach the Authorization header, so
+// any authenticated file download (CSV exports, etc.) has to go through
+// axios as a blob and be saved client-side instead.
+export const downloadAuthenticated = async (url, params, filename) => {
+  const res = await adminApi.get(url, { params, responseType: "blob" });
+  const blobUrl = window.URL.createObjectURL(res.data);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(blobUrl);
+};
+
 // ---- Auth (shared login endpoint; role is checked client-side) ----
 export const adminLogin = (data) => adminApi.post("/auth/login", data);
 export const adminMe = () => adminApi.get("/auth/me");
@@ -33,6 +48,12 @@ export const duplicateAdminProduct = (id) => adminApi.post(`/admin/products/${id
 export const adjustStock = (id, data) => adminApi.post(`/admin/products/${id}/adjust-stock`, data);
 export const getStockHistory = (id) => adminApi.get(`/admin/products/${id}/stock-history`);
 export const deleteAdminProduct = (id) => adminApi.delete(`/admin/products/${id}`);
+export const exportProductsCSV = () =>
+  downloadAuthenticated("/admin/products/export", {}, `products-export-${new Date().toISOString().slice(0, 10)}.csv`);
+export const downloadImportTemplate = () =>
+  downloadAuthenticated("/admin/products/import/template", {}, "product-import-template.csv");
+export const importProductsCSV = (formData) =>
+  adminApi.post("/admin/products/import", formData, { headers: { "Content-Type": "multipart/form-data" } });
 
 // ---- Customers ----
 export const getAdminCustomers = (params) => adminApi.get("/admin/customers", { params });

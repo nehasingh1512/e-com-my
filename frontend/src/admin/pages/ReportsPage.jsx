@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Download } from "lucide-react";
-import { getSalesReport, getBestSellersReport, getInventoryReport, getCustomersReport } from "../api/adminApi.js";
+import { getSalesReport, getBestSellersReport, getInventoryReport, getCustomersReport, downloadAuthenticated } from "../api/adminApi.js";
 
 const REPORTS = [
   { key: "sales", label: "Sales Report", fetch: getSalesReport, withDates: true },
@@ -15,6 +15,7 @@ export default function ReportsPage() {
   const [to, setTo] = useState("");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const report = REPORTS.find((r) => r.key === active);
 
@@ -29,10 +30,14 @@ export default function ReportsPage() {
     }
   };
 
-  const downloadCSV = () => {
-    const params = report.withDates && (from || to) ? { from, to, format: "csv" } : { format: "csv" };
-    const query = new URLSearchParams(params).toString();
-    window.open(`/api/admin/reports/${report.key}?${query}`, "_blank");
+  const downloadCSV = async () => {
+    setDownloading(true);
+    try {
+      const params = report.withDates && (from || to) ? { from, to, format: "csv" } : { format: "csv" };
+      await downloadAuthenticated(`/admin/reports/${report.key}`, params, `${report.key}-report.csv`);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const rows = data?.rows || (Array.isArray(data) ? data : []);
@@ -69,8 +74,8 @@ export default function ReportsPage() {
         <button onClick={runReport} className="bg-gray-800 text-white px-5 py-2 rounded-full text-sm hover:bg-gray-900">
           {loading ? "Running..." : "Run Report"}
         </button>
-        <button onClick={downloadCSV} className="flex items-center gap-1 border border-gray-300 px-5 py-2 rounded-full text-sm hover:bg-gray-50">
-          <Download size={14} /> Export CSV
+        <button onClick={downloadCSV} disabled={downloading} className="flex items-center gap-1 border border-gray-300 px-5 py-2 rounded-full text-sm hover:bg-gray-50 disabled:opacity-60">
+          <Download size={14} /> {downloading ? "Downloading..." : "Export CSV"}
         </button>
         <span className="text-xs text-gray-400">PDF/Excel export: use "Print" from your browser on this view, or process the CSV in Excel.</span>
       </div>
